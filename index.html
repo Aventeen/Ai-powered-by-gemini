@@ -1,1 +1,471 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SadBot Gemini</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    /* Global Styles */
+    body {
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      position: relative;
+      background-color: transparent; /* Pastikan body transparan */
+      z-index: 0; /* Z-index default untuk body */
+    }
 
+    /* Background Image Styling - KUNCI PERUBAHAN DI SINI */
+    #background-image {
+      position: fixed; /* Tetap di belakang meskipun scroll */
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center;
+      filter: brightness(0.8); /* Dim background biar teks lebih jelas */
+      z-index: -1; /* PENTING: Pastikan ini DI BAWAH SEMUA KONTEN LAIN */
+    }
+
+    /* Main Container (Simpel, tanpa style WA) */
+    .container {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: transparent; /* Pastikan container transparan */
+      padding: 0;
+      box-shadow: none;
+      border-radius: 0;
+      z-index: 1; /* Konten di atas background */
+      position: relative; /* Penting untuk z-index */
+    }
+
+    /* Chat Header */
+    .chat-header {
+      color: #333;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      font-weight: 700;
+      font-size: 1.1em;
+      margin-bottom: 10px;
+      background-color: rgba(255, 255, 255, 0.5); /* Header agak transparan */
+      border-radius: 0 0 8px 8px;
+      backdrop-filter: blur(5px);
+      z-index: 2; /* Di atas container */
+    }
+    .chat-header img {
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      margin-right: 12px;
+      background-color: #007bff;
+      object-fit: cover;
+    }
+
+    /* Chat Messages Area (Benar-benar Transparan untuk background-image) */
+    #chat-messages {
+      flex-grow: 1;
+      padding: 15px 20px;
+      overflow-y: auto;
+      background-color: transparent; /* Sangat PENTING: Transparan total! */
+      display: flex;
+      flex-direction: column;
+      margin: 0 10px 10px 10px;
+      position: relative; /* Penting untuk z-index */
+      z-index: 1; /* Di atas background-image */
+    }
+
+    /* Message Bubbles (Sedikit Latar Belakang biar Teks Terbaca) */
+    .message-bubble {
+      max-width: 85%;
+      padding: 10px 15px;
+      border-radius: 18px;
+      margin-bottom: 8px;
+      word-wrap: break-word;
+      line-height: 1.4;
+      font-size: 0.95em;
+      color: #333;
+      /* background-color diatur di JS berdasarkan mode */
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+      z-index: 3; /* Pastikan gelembung di atas semua */
+    }
+    .user-message {
+      align-self: flex-end;
+      background-color: rgba(224, 247, 250, 0.7); /* Biru muda agak transparan */
+    }
+    .bot-message {
+      align-self: flex-start;
+      background-color: rgba(255, 255, 255, 0.7); /* Putih agak transparan */
+    }
+    /* Hapus sudut lancip WA */
+    .message-bubble::after {
+        display: none;
+    }
+
+    /* Input Area */
+    .input-area {
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.5);
+      display: flex;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
+      margin-top: 10px;
+      backdrop-filter: blur(5px);
+      z-index: 2; /* Di atas container */
+    }
+    #prompt {
+      flex-grow: 1;
+      padding: 12px 15px;
+      border: 1px solid rgba(204, 204, 204, 0.5);
+      border-radius: 25px;
+      font-size: 1em;
+      margin-right: 10px;
+      background-color: rgba(255, 255, 255, 0.7);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+      backdrop-filter: blur(5px);
+    }
+    button {
+      padding: 12px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background-color 0.2s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    /* Loading and Error Indicators */
+    .loading-indicator, .error-message {
+      font-size: 0.85em;
+      color: #666;
+      margin-top: 5px;
+      text-align: center;
+      padding: 5px 0;
+      display: none;
+      background-color: rgba(255, 255, 255, 0.5);
+      border-radius: 4px;
+      backdrop-filter: blur(5px);
+      z-index: 2; /* Di atas container */
+    }
+    .error-message {
+      color: red;
+    }
+
+    /* Background Changer UI */
+    .background-changer {
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.5);
+      border-top: 1px solid rgba(255, 255, 255, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 -1px 3px rgba(0,0,0,0.03);
+      backdrop-filter: blur(5px);
+      z-index: 2; /* Di atas container */
+    }
+    #bg-url-input {
+      flex-grow: 1;
+      padding: 8px 12px;
+      border: 1px solid rgba(204, 204, 204, 0.5);
+      border-radius: 4px;
+      font-size: 0.9em;
+      background-color: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(5px);
+    }
+    .bg-button {
+      padding: 8px 15px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+    .bg-button:hover {
+      background-color: #218838;
+    }
+
+    /* Toggle UI */
+    .toggle-area {
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.5);
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.3);
+      align-items: center;
+      font-size: 0.9em;
+      box-shadow: 0 -1px 3px rgba(0,0,0,0.03);
+      backdrop-filter: blur(5px);
+      z-index: 2; /* Di atas container */
+    }
+    .toggle-button {
+      padding: 8px 12px;
+      background-color: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    .toggle-button:hover {
+      background-color: #5a6268;
+    }
+    .toggle-button.active {
+      background-color: #007bff;
+    }
+
+    /* Responsive adjustments for mobile */
+    @media (max-width: 768px) {
+      .container {
+        height: 100vh;
+        max-height: unset;
+        border-radius: 0;
+        margin: 0;
+      }
+      .chat-header {
+        padding: 15px;
+        border-radius: 0;
+      }
+      #chat-messages {
+        padding: 10px;
+        margin: 0;
+        border-radius: 0;
+      }
+      .input-area, .background-changer, .toggle-area {
+        padding: 10px;
+        border-radius: 0;
+      }
+      #prompt, button {
+        border-radius: 20px;
+      }
+      #bg-url-input {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="background-image"></div>
+
+  <div class="container">
+    <div class="chat-header">
+      <img src="https://via.placeholder.com/40/007bff/FFFFFF?text=SG" alt="SadBot Icon">
+      <span>SadBot Gemini</span>
+    </div>
+
+    <div id="chat-messages">
+    </div>
+
+    <div class="input-area">
+      <input id="prompt" type="text" placeholder="Ketik pesan..." onkeypress="handleKeyPress(event)">
+      <button onclick="send()">Kirim</button>
+    </div>
+    <div id="loadingIndicator" class="loading-indicator">SadBot sedang mengetik...</div>
+    <div id="errorMessage" class="error-message"></div>
+
+    <div class="background-changer">
+      <input type="text" id="bg-url-input" placeholder="URL Gambar Latar Belakang (http://... atau https://...)">
+      <button class="bg-button" onclick="changeBackground()">Ubah Latar</button>
+    </div>
+
+    <div class="toggle-area">
+        <label style="color: #333;">Mode Latar:</label>
+        <button id="normal-mode-button" class="toggle-button" onclick="toggleBackgroundMode('normal')">Normal</button>
+        <button id="transparent-mode-button" class="toggle-button active" onclick="toggleBackgroundMode('transparent')">Gambar Saja</button>
+    </div>
+  </div>
+
+  <script>
+    const API_KEY = "AIzaSyBsHku0irDQ-q1mq5Bj7aCchan3gQ6wnhY";
+    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
+    const AI_MODEL = "gemini-1.5-flash";
+
+    const chatMessagesDiv = document.getElementById("chat-messages");
+    const promptInput = document.getElementById("prompt");
+    const loadingIndicator = document.getElementById("loadingIndicator");
+    const errorMessageDiv = document.getElementById("errorMessage");
+    const backgroundImageDiv = document.getElementById("background-image");
+    const bgUrlInput = document.getElementById("bg-url-input");
+    const normalModeButton = document.getElementById("normal-mode-button");
+    const transparentModeButton = document.getElementById("transparent-mode-button");
+
+    let conversationHistory = [];
+
+    function appendMessage(sender, message, isError = false) {
+      const messageBubble = document.createElement('div');
+      messageBubble.classList.add('message-bubble');
+
+      if (sender === "Kamu") {
+        messageBubble.classList.add('user-message');
+      } else {
+        messageBubble.classList.add('bot-message');
+      }
+
+      messageBubble.innerHTML = message;
+      chatMessagesDiv.appendChild(messageBubble);
+      chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+
+      if (isError) {
+        errorMessageDiv.textContent = message;
+        errorMessageDiv.style.display = 'block';
+      } else {
+        errorMessageDiv.textContent = '';
+        errorMessageDiv.style.display = 'none';
+      }
+    }
+
+    function handleKeyPress(event) {
+      if (event.key === 'Enter') {
+        send();
+      }
+    }
+
+    async function send() {
+      const userMessage = promptInput.value.trim();
+
+      if (userMessage === "") {
+        return;
+      }
+
+      appendMessage("Kamu", userMessage);
+      promptInput.value = "";
+
+      loadingIndicator.style.display = 'block';
+
+      conversationHistory.push({ role: "user", parts: [{ text: userMessage }] });
+
+      let messagesForGemini = [...conversationHistory];
+
+      if (conversationHistory.length === 1 && conversationHistory.length === 1 && conversationHistory[0].role === "user") {
+          messagesForGemini[0].parts[0].text = `Sebagai asisten AI yang ramah, selalu gunakan Bahasa Indonesia yang santai dan panggil saya 'bro' dalam setiap balasanmu. Sekarang, ${userMessage}`;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}${AI_MODEL}:generateContent?key=${API_KEY}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: messagesForGemini
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          let errorMessage = `HTTP Error ${response.status}: ${response.statusText}`;
+          if (errorData.error && errorData.error.message) {
+            errorMessage += ` - ${errorData.error.message}`;
+          }
+          throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+        console.log("Full API Response:", JSON.stringify(data, null, 2));
+
+        const aiResponseContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (aiResponseContent) {
+          appendMessage("SadBot", aiResponseContent);
+          conversationHistory.push({ role: "model", parts: [{ text: aiResponseContent }] });
+        } else {
+          appendMessage("SadBot", "[Error: Respons AI tidak memiliki konten yang diharapkan. Cek konsol untuk detail.]", true);
+          console.error("API response missing content:", data);
+        }
+
+      } catch (error) {
+        let userFacingError = `[Error: Gagal terhubung atau mendapatkan respons dari SadBot.`;
+        if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
+          userFacingError += ` Coba cek koneksi internetmu atau API Key.`;
+        } else if (error.message.includes("HTTP Error 400")) {
+            userFacingError += ` Permintaan tidak valid. Cek format pesan atau model ID.`;
+        } else if (error.message.includes("HTTP Error 401") || error.message.includes("API key not valid")) {
+          userFacingError += ` API Keymu mungkin tidak valid atau belum diaktifkan.`;
+        } else if (error.message.includes("HTTP Error 429")) {
+          userFacingError += ` Terlalu banyak permintaan (Rate Limit Exceeded). Coba lagi nanti.`;
+        } else {
+          userFacingError += ` Detail: ${error.message}.`;
+        }
+        userFacingError += `]`;
+
+        appendMessage("SadBot", userFacingError, true);
+        console.error("Fetch or API processing error:", error);
+
+      } finally {
+        loadingIndicator.style.display = 'none';
+        promptInput.focus();
+      }
+    }
+
+    function changeBackground() {
+      const imageUrl = bgUrlInput.value.trim();
+      if (imageUrl) {
+        backgroundImageDiv.style.backgroundImage = `url('${imageUrl}')`;
+        localStorage.setItem('sadbotBgUrl', imageUrl);
+        toggleBackgroundMode('transparent');
+      } else {
+        alert("Bro, masukkan URL gambar dulu ya!");
+      }
+    }
+
+    function toggleBackgroundMode(mode) {
+      const container = document.querySelector('.container');
+
+      if (mode === 'normal') {
+        container.classList.remove('transparent-mode');
+        // Saat mode normal, hapus background-image di body
+        backgroundImageDiv.style.backgroundImage = 'none';
+        normalModeButton.classList.add('active');
+        transparentModeButton.classList.remove('active');
+        localStorage.setItem('sadbotBgMode', 'normal');
+      } else if (mode === 'transparent') {
+        container.classList.add('transparent-mode');
+        const savedBgUrl = localStorage.getItem('sadbotBgUrl');
+        if (savedBgUrl) {
+          backgroundImageDiv.style.backgroundImage = `url('${savedBgUrl}')`;
+        } else {
+          backgroundImageDiv.style.backgroundImage = 'none';
+          toggleBackgroundMode('normal');
+          alert("Bro, kamu harus masukkan URL gambar dulu untuk mode Gambar Saja!");
+          return;
+        }
+        normalModeButton.classList.remove('active');
+        transparentModeButton.classList.add('active');
+        localStorage.setItem('sadbotBgMode', 'transparent');
+      }
+      chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }
+
+    window.onload = () => {
+      promptInput.focus();
+      const savedBgUrl = localStorage.getItem('sadbotBgUrl');
+      if (savedBgUrl) {
+        bgUrlInput.value = savedBgUrl;
+      }
+
+      const savedBgMode = localStorage.getItem('sadbotBgMode');
+      if (savedBgMode === 'transparent') {
+        toggleBackgroundMode('transparent');
+      } else {
+        toggleBackgroundMode('normal');
+      }
+
+      appendMessage("SadBot", "Halo bro! Ketik pesanmu di sini ya. Lo bisa ganti latar belakang pakai URL gambar di bawah, terus atur modenya jadi 'Gambar Saja' biar putihnya hilang.");
+    };
+  </script>
+</body>
+</html>
